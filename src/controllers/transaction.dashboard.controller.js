@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Transaction from "../models/Transaction.js";
+import User from "../models/User.js";
 
 /* ---------- HELPER: date range ---------- */
 const getDateRange = (period, year, month, from, to) => {
@@ -40,17 +41,27 @@ const getDateRange = (period, year, month, from, to) => {
   return { startDate, endDate };
 };
 
+/* ---------- HELPER: Build match filter ---------- */
+const buildMatch = (req) => {
+  const { period, year, month, from, to, filial, product } = req.query;
+  const { startDate, endDate } = getDateRange(period, year, month, from, to);
+
+  const match = { createdAt: { $gte: startDate, $lte: endDate } };
+
+  if (req.user.role !== "superadmin") {
+    match.admin = new mongoose.Types.ObjectId(req.user.id);
+  }
+
+  if (filial) match.filial = new mongoose.Types.ObjectId(filial);
+  if (product) match.product = new mongoose.Types.ObjectId(product);
+
+  return match;
+};
+
 /* ---------- SUMMARY ---------- */
 export const getTransactionSummary = async (req, res) => {
   try {
-    const { period, year, month, from, to } = req.query;
-    const { startDate, endDate } = getDateRange(period, year, month, from, to);
-
-    // rolga qarab match
-    let match = { createdAt: { $gte: startDate, $lte: endDate } };
-    if (req.user.role !== "superadmin") {
-      match.admin = new mongoose.Types.ObjectId(req.user.id);
-    }
+    const match = buildMatch(req);
 
     const data = await Transaction.aggregate([
       { $match: match },
@@ -93,17 +104,12 @@ export const getTransactionSummary = async (req, res) => {
 /* ---------- STATS / CHART ---------- */
 export const getTransactionStats = async (req, res) => {
   try {
-    const { period = "year", year, month, from, to } = req.query;
-    const { startDate, endDate } = getDateRange(period, year, month, from, to);
+    const { period = "year" } = req.query;
+    const match = buildMatch(req);
 
     let dateFormat = "%Y-%m";
     if (period === "month" || period === "week") dateFormat = "%Y-%m-%d";
     if (period === "day") dateFormat = "%H:00";
-
-    let match = { createdAt: { $gte: startDate, $lte: endDate } };
-    if (req.user.role !== "superadmin") {
-      match.admin = new mongoose.Types.ObjectId(req.user.id);
-    }
 
     const data = await Transaction.aggregate([
       { $match: match },
@@ -148,17 +154,13 @@ export const getTransactionStats = async (req, res) => {
 /* ---------- LATEST ---------- */
 export const getLatestTransactions = async (req, res) => {
   try {
-    const { period, year, month, from, to } = req.query;
-    const { startDate, endDate } = getDateRange(period, year, month, from, to);
-
-    let match = { createdAt: { $gte: startDate, $lte: endDate } };
-    if (req.user.role !== "superadmin") {
-      match.admin = new mongoose.Types.ObjectId(req.user.id);
-    }
+    const match = buildMatch(req);
 
     const transactions = await Transaction.find(match)
       .populate("user", "fullname phone")
       .populate("admin", "fullname phone role")
+      .populate("product", "name unit price")
+      .populate("filial", "name")
       .sort({ createdAt: -1 })
       .limit(10);
 
@@ -171,22 +173,30 @@ export const getLatestTransactions = async (req, res) => {
 /* ---------- TOP USERS ---------- */
 export const getTopUsersByEarn = async (req, res) => {
   try {
-    const { period, year, month, from, to } = req.query;
-    const { startDate, endDate } = getDateRange(period, year, month, from, to);
-
-    let match = { type: "earn", createdAt: { $gte: startDate, $lte: endDate } };
-    if (req.user.role !== "superadmin") {
-      match.admin = new mongoose.Types.ObjectId(req.user.id);
-    }
+    const match = buildMatch(req);
+    match.type = "earn";
 
     const users = await Transaction.aggregate([
       { $match: match },
-      { $group: { _id: "$user", totalEarn: { $sum: "$amount" } } },
+      {
+        $group: {
+          _id: "$user",
+          totalEarn: { $sum: "$amount" },
+          product: { $first: "$product" },
+          filial: { $first: "$filial" },
+        },
+      },
       { $sort: { totalEarn: -1 } },
       { $limit: 5 },
     ]);
 
-    res.json(users);
+    const populatedUsers = await User.populate(users, [
+      { path: "_id", select: "fullname phone" },
+      { path: "product", select: "name unit price" },
+      { path: "filial", select: "name" },
+    ]);
+
+    res.json(populatedUsers);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
