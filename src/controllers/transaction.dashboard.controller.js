@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Transaction from "../models/Transaction.js";
 import User from "../models/User.js";
+import Product from "../models/Product.js"; // mahsulot modeli
 
 /* ---------- HELPER: date range ---------- */
 const getDateRange = (period, year, month, from, to) => {
@@ -41,38 +42,72 @@ const getDateRange = (period, year, month, from, to) => {
   return { startDate, endDate };
 };
 
-/* ---------- HELPER: Build match filter ---------- */
+/* ---------- HELPER: Build match ---------- */
 const buildMatch = (req) => {
-  const { period, year, month, from, to, filial, product } = req.query;
+  const { period, year, month, from, to, filial } = req.query;
   const { startDate, endDate } = getDateRange(period, year, month, from, to);
 
-  const match = { createdAt: { $gte: startDate, $lte: endDate } };
+  const match = {
+    createdAt: { $gte: startDate, $lte: endDate },
+  };
 
   if (req.user.role !== "superadmin") {
     match.admin = new mongoose.Types.ObjectId(req.user.id);
   }
 
   if (filial) match.filial = new mongoose.Types.ObjectId(filial);
-  if (product) match.product = new mongoose.Types.ObjectId(product);
 
   return match;
+};
+
+/* ---------- GET PRODUCTS BY FILIAL ---------- */
+export const getProductsByFilial = async (req, res) => {
+  try {
+    const { filial } = req.query;
+
+    if (!filial) return res.status(400).json({ message: "Filial ID required" });
+
+    const products = await Product.find({ filial, isActive: true }).select(
+      "_id name unit price"
+    );
+
+    res.json(products);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 };
 
 /* ---------- SUMMARY ---------- */
 export const getTransactionSummary = async (req, res) => {
   try {
     const match = buildMatch(req);
+    const productId = req.query.product;
 
-    const data = await Transaction.aggregate([
-      { $match: match },
-      {
+    let pipeline = [{ $match: match }];
+
+    if (productId) {
+      pipeline.push({ $unwind: "$items" });
+      pipeline.push({
+        $match: { "items.product": new mongoose.Types.ObjectId(productId) },
+      });
+      pipeline.push({
         $group: {
           _id: "$type",
-          totalAmount: { $sum: "$amount" },
+          totalAmount: { $sum: "$items.amount" },
           count: { $sum: 1 },
         },
-      },
-    ]);
+      });
+    } else {
+      pipeline.push({
+        $group: {
+          _id: "$type",
+          totalAmount: { $sum: "$totalAmount" },
+          count: { $sum: 1 },
+        },
+      });
+    }
+
+    const data = await Transaction.aggregate(pipeline);
 
     const summary = {
       earn: 0,
@@ -94,7 +129,6 @@ export const getTransactionSummary = async (req, res) => {
     });
 
     summary.balance = summary.earn - summary.spend;
-
     res.json(summary);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -106,37 +140,45 @@ export const getTransactionStats = async (req, res) => {
   try {
     const { period = "year" } = req.query;
     const match = buildMatch(req);
+    const productId = req.query.product;
 
     let dateFormat = "%Y-%m";
     if (period === "month" || period === "week") dateFormat = "%Y-%m-%d";
     if (period === "day") dateFormat = "%H:00";
 
-    const data = await Transaction.aggregate([
-      { $match: match },
-      {
-        $group: {
-          _id: {
-            label: {
-              $dateToString: { format: dateFormat, date: "$createdAt" },
-            },
-            type: "$type",
-          },
-          total: { $sum: "$amount" },
+    let pipeline = [{ $match: match }];
+    if (productId) {
+      pipeline.push({ $unwind: "$items" });
+      pipeline.push({
+        $match: { "items.product": new mongoose.Types.ObjectId(productId) },
+      });
+    }
+
+    pipeline.push({
+      $group: {
+        _id: {
+          label: { $dateToString: { format: dateFormat, date: "$createdAt" } },
+          type: "$type",
+        },
+        total: productId ? { $sum: "$items.amount" } : { $sum: "$totalAmount" },
+      },
+    });
+
+    pipeline.push({
+      $group: {
+        _id: "$_id.label",
+        earn: {
+          $sum: { $cond: [{ $eq: ["$_id.type", "earn"] }, "$total", 0] },
+        },
+        spend: {
+          $sum: { $cond: [{ $eq: ["$_id.type", "spend"] }, "$total", 0] },
         },
       },
-      {
-        $group: {
-          _id: "$_id.label",
-          earn: {
-            $sum: { $cond: [{ $eq: ["$_id.type", "earn"] }, "$total", 0] },
-          },
-          spend: {
-            $sum: { $cond: [{ $eq: ["$_id.type", "spend"] }, "$total", 0] },
-          },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
+    });
+
+    pipeline.push({ $sort: { _id: 1 } });
+
+    const data = await Transaction.aggregate(pipeline);
 
     res.json(
       data.map((i) => ({
@@ -151,18 +193,38 @@ export const getTransactionStats = async (req, res) => {
   }
 };
 
-/* ---------- LATEST ---------- */
+/* ---------- LATEST TRANSACTIONS ---------- */
 export const getLatestTransactions = async (req, res) => {
   try {
     const match = buildMatch(req);
+    const productId = req.query.product;
 
-    const transactions = await Transaction.find(match)
+    let transactions = await Transaction.find(match)
       .populate("user", "fullname phone")
       .populate("admin", "fullname phone role")
-      .populate("product", "name unit price")
       .populate("filial", "name")
+      .populate("items.product", "name unit price")
       .sort({ createdAt: -1 })
       .limit(10);
+
+    if (productId) {
+      transactions = transactions.map((tx) => {
+        const filteredItems = tx.items.filter(
+          (item) => item.product._id.toString() === productId
+        );
+        const totalAmount = filteredItems.reduce((sum, i) => sum + i.amount, 0);
+        const totalCashback = filteredItems.reduce(
+          (sum, i) => sum + i.cashback,
+          0
+        );
+        return {
+          ...tx.toObject(),
+          items: filteredItems,
+          totalAmount,
+          totalCashback,
+        };
+      });
+    }
 
     res.json(transactions);
   } catch (err) {
@@ -170,33 +232,38 @@ export const getLatestTransactions = async (req, res) => {
   }
 };
 
-/* ---------- TOP USERS ---------- */
+/* ---------- TOP USERS BY EARN ---------- */
 export const getTopUsersByEarn = async (req, res) => {
   try {
     const match = buildMatch(req);
+    const productId = req.query.product;
     match.type = "earn";
 
-    const users = await Transaction.aggregate([
-      { $match: match },
-      {
-        $group: {
-          _id: "$user",
-          totalEarn: { $sum: "$amount" },
-          product: { $first: "$product" },
-          filial: { $first: "$filial" },
-        },
-      },
-      { $sort: { totalEarn: -1 } },
-      { $limit: 5 },
-    ]);
+    let pipeline = [{ $match: match }];
+    if (productId) {
+      pipeline.push({ $unwind: "$items" });
+      pipeline.push({
+        $match: { "items.product": new mongoose.Types.ObjectId(productId) },
+      });
+      pipeline.push({
+        $group: { _id: "$user", totalEarn: { $sum: "$items.amount" } },
+      });
+    } else {
+      pipeline.push({
+        $group: { _id: "$user", totalEarn: { $sum: "$totalAmount" } },
+      });
+    }
 
-    const populatedUsers = await User.populate(users, [
-      { path: "_id", select: "fullname phone" },
-      { path: "product", select: "name unit price" },
-      { path: "filial", select: "name" },
-    ]);
+    pipeline.push({ $sort: { totalEarn: -1 } });
+    pipeline.push({ $limit: 5 });
 
-    res.json(populatedUsers);
+    let users = await Transaction.aggregate(pipeline);
+    const populated = await User.populate(users, {
+      path: "_id",
+      select: "fullname phone balance",
+    });
+
+    res.json(populated);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

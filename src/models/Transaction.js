@@ -1,8 +1,28 @@
 import mongoose from "mongoose";
 
+const transactionItemSchema = new mongoose.Schema(
+  {
+    product: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Product",
+      required: true,
+    },
+    quantity: { type: Number, required: true },
+    price: { type: Number, required: true }, // product.price
+    discount: { type: Number, default: 0 },
+    amount: { type: Number, required: true }, // price * qty - discount
+    cashback: { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
 const transactionSchema = new mongoose.Schema(
   {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
     admin: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Admin",
@@ -12,15 +32,14 @@ const transactionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Filial",
       required: true,
-    }, // qaysi filialda
-    product: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Product",
-      required: true,
-    }, // qaysi product
+    },
+
     type: { type: String, enum: ["earn", "spend"], required: true },
-    amount: { type: Number, required: true }, // miqdor (price)
-    percent: { type: Number, default: 0 }, // cashback foiz
+
+    items: [transactionItemSchema], // ✅ KO‘P PRODUCT
+
+    totalAmount: { type: Number, required: true },
+    totalCashback: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

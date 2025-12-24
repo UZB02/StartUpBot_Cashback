@@ -2,7 +2,8 @@ import { Router } from "express";
 import {
   addPurchase,
   spendBalance,
-  getTransactions, // yangi endpoint
+  getTransactions,
+  getProductsByFilial,
 } from "../controllers/transaction.controller.js";
 import { authMiddleware } from "../middlewares/auth.middleware.js";
 
@@ -16,5 +17,8 @@ router.post("/spend", authMiddleware, spendBalance);
 
 /* 📄 Barcha tranzaksiyalarni olish */
 router.get("/", authMiddleware, getTransactions);
+
+/* 🔹 Filialga qarab mahsulotlarni olish */
+router.get("/products", authMiddleware, getProductsByFilial);
 
 export default router;
