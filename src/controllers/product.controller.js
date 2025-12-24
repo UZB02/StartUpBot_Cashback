@@ -1,5 +1,6 @@
 import Product from "../models/Product.js";
 import Filial from "../models/Filial.js";
+import mongoose from "mongoose";
 
 /* ➕ Product qo'shish */
 export const createProduct = async (req, res) => {
@@ -112,5 +113,40 @@ export const applyGlobalDiscount = async (req, res) => {
     res.json({ message: `Barcha productlarga ${discount}% chegirma qo'yildi` });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+/* 🔍 Filial bo'yicha productlarni olish yoki barcha productlar */
+export const getProductsByFilial = async (req, res) => {
+  try {
+    const { filial } = req.query;
+
+    // Filter obyektini yaratamiz
+    const filter = {};
+
+    if (filial) {
+      // ID validligini tekshirish
+      if (!mongoose.Types.ObjectId.isValid(filial)) {
+        return res.status(400).json({ message: "Filial ID noto‘g‘ri" });
+      }
+
+      // Filial mavjudligini tekshirish
+      const existingFilial = await Filial.findById(filial);
+      if (!existingFilial) {
+        return res.status(404).json({ message: "Filial topilmadi" });
+      }
+
+      filter.filial = filial;
+    }
+
+    // Productlarni filter bo‘yicha olish
+    const products = await Product.find(filter)
+      .populate("filial", "name address")
+      .sort({ createdAt: -1 });
+
+    res.json(products);
+  } catch (error) {
+    console.error("getProductsByFilial error:", error);
+    res.status(500).json({ message: "Server xatoligi: " + error.message });
   }
 };

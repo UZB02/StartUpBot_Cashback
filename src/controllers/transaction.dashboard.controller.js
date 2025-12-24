@@ -4,39 +4,44 @@ import User from "../models/User.js";
 import Product from "../models/Product.js"; // mahsulot modeli
 
 /* ---------- HELPER: date range ---------- */
-const getDateRange = (period, year, month, from, to) => {
+const getDateRange = (period, year, month, from) => {
   const now = new Date();
+  let startDate, endDate;
+
+  if (period === "day") {
+    // agar from kelsa — o‘sha kun, bo‘lmasa — bugun
+    const day = from ? new Date(from) : new Date();
+
+    startDate = new Date(day);
+    startDate.setHours(0, 0, 0, 0);
+
+    endDate = new Date(day);
+    endDate.setHours(23, 59, 59, 999);
+
+    return { startDate, endDate };
+  }
+
+  // qolgan periodlar o‘z holicha
   const selectedYear = Number(year) || now.getFullYear();
   const selectedMonth = Number(month) || now.getMonth() + 1;
 
-  let startDate, endDate;
-
-  if (from && to) {
-    startDate = new Date(from);
-    endDate = new Date(to);
-  } else if (period === "year") {
+  if (period === "year") {
     startDate = new Date(selectedYear, 0, 1);
-    endDate = new Date(selectedYear, 11, 31, 23, 59, 59);
+    endDate = new Date(selectedYear, 11, 31, 23, 59, 59, 999);
   } else if (period === "month") {
     startDate = new Date(selectedYear, selectedMonth - 1, 1);
-    endDate = new Date(selectedYear, selectedMonth, 0, 23, 59, 59);
+    endDate = new Date(selectedYear, selectedMonth, 0, 23, 59, 59, 999);
   } else if (period === "week") {
     const today = new Date();
     const day = today.getDay() || 7;
+
     startDate = new Date(today);
     startDate.setDate(today.getDate() - day + 1);
+    startDate.setHours(0, 0, 0, 0);
+
     endDate = new Date(startDate);
     endDate.setDate(startDate.getDate() + 6);
-  } else if (period === "day") {
-    startDate = new Date(selectedYear, selectedMonth - 1, now.getDate());
-    endDate = new Date(
-      selectedYear,
-      selectedMonth - 1,
-      now.getDate(),
-      23,
-      59,
-      59
-    );
+    endDate.setHours(23, 59, 59, 999);
   }
 
   return { startDate, endDate };
@@ -45,20 +50,32 @@ const getDateRange = (period, year, month, from, to) => {
 /* ---------- HELPER: Build match ---------- */
 const buildMatch = (req) => {
   const { period, year, month, from, to, filial } = req.query;
+
   const { startDate, endDate } = getDateRange(period, year, month, from, to);
 
+  // himoya: sana yo‘q bo‘lsa
+  if (!startDate || !endDate) {
+    throw new Error("Date range noto‘g‘ri berilgan");
+  }
+
   const match = {
-    createdAt: { $gte: startDate, $lte: endDate },
+    createdAt: {
+      $gte: startDate,
+      $lte: endDate,
+    },
   };
 
   if (req.user.role !== "superadmin") {
     match.admin = new mongoose.Types.ObjectId(req.user.id);
   }
 
-  if (filial) match.filial = new mongoose.Types.ObjectId(filial);
+  if (filial) {
+    match.filial = new mongoose.Types.ObjectId(filial);
+  }
 
   return match;
 };
+
 
 /* ---------- GET PRODUCTS BY FILIAL ---------- */
 export const getProductsByFilial = async (req, res) => {
