@@ -1,5 +1,6 @@
 import User from "../models/User.js";
 import { generateQRCode } from "../services/qr.service.js";
+import { generateCardNumber,formatCardNumber } from "../services/cardnumber.service.js";
 import {
   languageKeyboard,
   phoneKeyboard,
@@ -18,31 +19,40 @@ export const startHandler = async (ctx) => {
       step: "language",
       balance: 0,
     });
+
     return ctx.reply(getText(user, "selectLanguage"), languageKeyboard);
   }
 
   switch (user.step) {
     case "language":
       return ctx.reply(getText(user, "selectLanguage"), languageKeyboard);
+
     case "phone":
       return ctx.reply(getText(user, "phoneRequest"), phoneKeyboard);
+
     case "fullname":
       return ctx.reply(getText(user, "fullnameRequest"), removeKeyboard);
+
     case "auto":
       return ctx.reply(getText(user, "autoRequest"), removeKeyboard);
+
     case "done":
       return ctx.replyWithPhoto(
         { source: Buffer.from(user.qrcode.split(",")[1], "base64") },
         {
-          caption: `👤 ${user.fullname}\n📞 ${user.phone}\n🚗 ${
-            user.autoNumber
-          }\n💰 ${getText(user, "balanceText", {
-            balance: user.balance,
-            purchase: user.latestPurchase?.amount || 0,
-          })}`,
+          caption:
+            `👤 ${user.fullname}\n` +
+            `📞 ${user.phone}\n` +
+            `🚗 ${user.autoNumber}\n` +
+            `💳 ${user.cardNumber}\n` +
+            `💰 ${getText(user, "balanceText", {
+              balance: user.balance,
+              purchase: user.latestPurchase?.amount || 0,
+            })}`,
           reply_markup: getMainMenuKeyboard(user).reply_markup,
         }
       );
+
     default:
       user.step = "language";
       await user.save();
@@ -58,22 +68,17 @@ export const languageHandler = async (ctx) => {
 
   user.language = lang;
 
-  // 🔥 FAQAT YANGI USER UCHUN
   if (!user.phone) {
     user.step = "phone";
     await user.save();
-
     await ctx.answerCbQuery();
     return ctx.reply(getText(user, "phoneRequest"), phoneKeyboard);
   }
 
-  // ✅ ESKI USER UCHUN
   await user.save();
   await ctx.answerCbQuery();
-
   return ctx.reply(getText(user, "languageChanged"), getMainMenuKeyboard(user));
 };
-
 
 /* Telefon raqam */
 export const contactHandler = async (ctx) => {
@@ -90,7 +95,7 @@ export const contactHandler = async (ctx) => {
   user.step = "fullname";
   await user.save();
 
-  await ctx.reply(getText(user, "fullnameRequest"), removeKeyboard);
+  return ctx.reply(getText(user, "fullnameRequest"), removeKeyboard);
 };
 
 /* Ism familiya */
@@ -99,31 +104,42 @@ export const fullnameHandler = async (ctx, user) => {
   user.step = "auto";
   await user.save();
 
-  await ctx.reply(getText(user, "autoRequest"), removeKeyboard);
+  return ctx.reply(getText(user, "autoRequest"), removeKeyboard);
 };
 
 /* Avtomobil raqami */
 export const autoNumberHandler = async (ctx, user) => {
+  // 🚗 Avto raqam
   user.autoNumber = ctx.message.text;
 
-  const qr = await generateQRCode(user._id);
+  // 💳 Karta raqami faqat 1 marta yaratiladi
+  if (!user.cardNumber) {
+    user.cardNumber = generateCardNumber();
+  }
+
+  // 🔳 QR ichida userId + cardNumber
+  const qr = await generateQRCode({
+    userId: user._id,
+    cardNumber: user.cardNumber,
+  });
+
   user.qrcode = qr;
   user.step = "done";
   await user.save();
 
-  await ctx.replyWithPhoto(
+  return ctx.replyWithPhoto(
     { source: Buffer.from(qr.split(",")[1], "base64") },
     {
-      caption: `${getText(user, "registrationDone")}\n\n👤 ${
-        user.fullname
-      }\n📞 ${user.phone}\n🚗 ${user.autoNumber}\n💰 ${getText(
-        user,
-        "balanceText",
-        {
+      caption:
+        `${getText(user, "registrationDone")}\n\n` +
+        `👤 ${user.fullname}\n` +
+        `📞 ${user.phone}\n` +
+        `🚗 ${user.autoNumber}\n` +
+        `💳 ${user.cardNumber}\n` +
+        `💰 ${getText(user, "balanceText", {
           balance: user.balance,
           purchase: user.latestPurchase?.amount || 0,
-        }
-      )}`,
+        })}`,
       reply_markup: getMainMenuKeyboard(user).reply_markup,
     }
   );
@@ -142,14 +158,15 @@ export const menuTextHandler = async (ctx) => {
       return ctx.replyWithPhoto(
         { source: Buffer.from(user.qrcode.split(",")[1], "base64") },
         {
-          caption: `👤 ${user.fullname}\n📞 ${user.phone}\n💰 ${getText(
-            user,
-            "balanceText",
-            {
+          caption:
+            `👤 ${user.fullname}\n` +
+            `📞 ${user.phone}\n` +
+            `🚗 ${user.autoNumber}\n` +
+            `💳 ${user.cardNumber}\n` +
+            `💰 ${getText(user, "balanceText", {
               balance: user.balance,
               purchase: user.latestPurchase?.amount || 0,
-            }
-          )}`,
+            })}`,
           reply_markup: getMainMenuKeyboard(user).reply_markup,
         }
       );

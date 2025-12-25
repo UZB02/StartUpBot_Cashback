@@ -7,6 +7,7 @@ const userSchema = new mongoose.Schema(
     phone: String,
     autoNumber: String,
     qrcode: String,
+    cardNumber: { type: String, unique: true, sparse: true,},
     language: String,
     step: { type: String, default: "language" },
     companyFilial: { type: mongoose.Schema.Types.ObjectId, ref: "Filial" },
