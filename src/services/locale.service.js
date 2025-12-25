@@ -16,14 +16,19 @@ export const getText = (user, key, vars = {}) => {
   return text;
 };
 
-// Menu tugmalarini olish
+// Menu tugmalarini olish (Filiallarimiz qo‘shildi)
 export const getMenu = (user) => {
   const lang = user?.language || "uz";
   const messages = locales[lang] || locales["uz"];
-  return [
+  const menu = [
     messages.menu.balance,
     messages.menu.editInfo,
     messages.menu.editAuto,
     messages.menu.changeLang,
   ];
+
+  // Filiallarimiz tugmasini qo‘shamiz
+  if (messages.menu.filials) menu.push(messages.menu.filials);
+
+  return menu;
 };

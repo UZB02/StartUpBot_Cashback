@@ -7,13 +7,17 @@ import mongoose from "mongoose";
 /* ➕ Filial qo‘shish */
 export const createFilial = async (req, res) => {
   try {
-    const { name, address } = req.body;
+    const { name, address, region, location, workingHours } = req.body;
     if (!name) return res.status(400).json({ message: "Filial nomi majburiy" });
+    if (!region) return res.status(400).json({ message: "Viloyat majburiy" });
 
     const filial = await Filial.create({
       name,
       address,
+      region,
       admins: [],
+      location: location || { type: "Point", coordinates: [0, 0] },
+      workingHours: workingHours || { start: "09:00", end: "18:00" },
     });
 
     res.status(201).json(filial);
@@ -28,14 +32,12 @@ export const getFilials = async (req, res) => {
     let filials;
 
     if (req.user.role === "superadmin") {
-      // Superadmin uchun barcha filiallar
       filials = await Filial.find()
         .sort({ createdAt: -1 })
         .populate("admins", "-password");
     } else {
-      // Oddiy admin uchun faqat o‘ziga biriktirilgan filial
       filials = await Filial.find({
-        admins: new mongoose.Types.ObjectId(req.user.id), // ⚡ 'new' bilan ObjectId
+        admins: new mongoose.Types.ObjectId(req.user.id),
       })
         .sort({ createdAt: -1 })
         .populate("admins", "-password");
@@ -47,10 +49,6 @@ export const getFilials = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-
-
-
-
 
 /* 📄 Bitta filial */
 export const getFilialById = async (req, res) => {
@@ -72,11 +70,21 @@ export const getFilialById = async (req, res) => {
 export const updateFilial = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, address, isActive } = req.body;
+    const { name, address, region, isActive, location, workingHours } =
+      req.body;
+
+    if (!region) return res.status(400).json({ message: "Viloyat majburiy" }); // ✅ qo‘shish
 
     const filial = await Filial.findByIdAndUpdate(
       id,
-      { name, address, isActive },
+      {
+        name,
+        address,
+        region, // ✅ region qo‘shildi
+        isActive,
+        location: location || { type: "Point", coordinates: [0, 0] },
+        workingHours: workingHours || { start: "09:00", end: "18:00" },
+      },
       { new: true }
     ).populate("admins", "-password");
 
@@ -84,9 +92,11 @@ export const updateFilial = async (req, res) => {
 
     res.json(filial);
   } catch (err) {
+    console.error("updateFilial error:", err); // ❗ log qo‘shish
     res.status(500).json({ message: err.message });
   }
 };
+
 
 /* 🗑 Filialni o‘chirish */
 export const deleteFilial = async (req, res) => {
@@ -119,11 +129,9 @@ export const assignAdminToFilial = async (req, res) => {
     const admin = await Admin.findById(adminId);
     if (!admin) return res.status(404).json({ message: "Admin topilmadi" });
 
-    // Adminning filial maydonini yangilash
     admin.filial = filialId;
     await admin.save();
 
-    // Filial modelidagi admins arrayga qo‘shish
     if (!filial.admins.includes(adminId)) {
       filial.admins.push(adminId);
       await filial.save();

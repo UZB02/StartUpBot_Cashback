@@ -4,7 +4,7 @@ export const uz = {
   fullnameRequest: "✍️ Ism familiyangizni kiriting",
   autoRequest: "🚗 Avtomobil davlat raqamini kiriting\nMasalan: 01A123AA",
   registrationDone: "✅ Ro‘yxatdan o‘tish yakunlandi",
-  balanceText: "💰 Sizning balansingiz: {balance}\n🕒 Oxirgi xarid: {purchase}",
+  balanceText: "Sizning balansingiz: {balance} UZS\n🕒 Oxirgi xarid: {purchase}",
   changeFullname: "✍️ Yangi ism va familiyangizni kiriting",
   changeAuto: "🚗 Yangi avtomobil raqamingizni kiriting",
   invalidAction: "❌ Iltimos, ko‘rsatmalarga amal qiling",
@@ -15,5 +15,6 @@ export const uz = {
     editInfo: "📝 Ma'lumotlarni o‘zgartirish",
     editAuto: "🚗 Avto raqamni o‘zgartirish",
     changeLang: "🌐 Tilni o‘zgartirish",
+    filials: "🏢 Filiallarimiz", // <-- shu yerda qo‘shildi
   },
 };

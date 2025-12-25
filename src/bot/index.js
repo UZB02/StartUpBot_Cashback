@@ -8,18 +8,22 @@ import {
   fullnameHandler,
   autoNumberHandler,
   menuTextHandler,
+  filialHandler,
+  regionHandler,
+  filialInfoHandler,
 } from "./handlers.js";
-import {
-  getMainMenuKeyboard,
-  mainMenuKeyboard,
-} from "../services/telegram.service.js";
 import { getMenu, getText } from "../services/locale.service.js";
+import { getMainMenuKeyboard } from "../services/telegram.service.js";
 
 // /start
 bot.start(startHandler);
 
 // Til tanlash (inline keyboard)
 bot.action(/^lang_/, languageHandler);
+
+// Region va filial action
+bot.action(/^region_/, regionHandler);
+bot.action(/^filial_/, filialInfoHandler);
 
 // MESSAGE handler
 bot.on("message", async (ctx) => {
@@ -30,7 +34,7 @@ bot.on("message", async (ctx) => {
   if (ctx.message.contact) return contactHandler(ctx);
 
   // Main menu tugmalari
-  const menu = user ? getMenu(user) : [];
+  const menu = getMenu(user);
   if (menu.includes(ctx.message.text)) return menuTextHandler(ctx);
 
   // Step handler

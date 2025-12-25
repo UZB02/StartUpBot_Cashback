@@ -33,8 +33,9 @@ export const getMainMenuKeyboard = (user) => {
   return {
     reply_markup: {
       keyboard: [
-        [{ text: menu[0] }, { text: menu[1] }], // Balans [0]  // Ma'lumotlarni o'zgartirish[1]
-        [{ text: menu[2] }, { text: menu[3] }], // Avto raqamni o'zgartirish [2] // Tilni o'zgartirish [3]
+        [{ text: menu[0] }, { text: menu[1] }], // Balans // Ma'lumotlarni o'zgartirish
+        [{ text: menu[2] }, { text: menu[3] }], // Avto raqamni o'zgartirish // Tilni o'zgartirish
+        [{ text: menu[4] }], // Filiallarimiz (yagona tugma)
       ],
       resize_keyboard: true,
       one_time_keyboard: false,
@@ -50,6 +51,7 @@ export const mainMenuKeyboard = {
       [{ text: "📝 Ma'lumotlarni o‘zgartirish" }],
       [{ text: "🚗 Avto raqamni o‘zgartirish" }],
       [{ text: "🌐 Tilni o‘zgartirish" }],
+      [{ text: "🏢 Filiallarimiz" }], // filiallar tugmasi
     ],
     resize_keyboard: true,
     one_time_keyboard: false,
