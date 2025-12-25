@@ -6,26 +6,28 @@ import User from "../models/User.js";
  */
 export const findUser = async (req, res) => {
   try {
-    const { phone, autoNumber, fullname, qrcode } = req.query;
+    const { phone, autoNumber, fullname, qrcode, userId } = req.query;
 
-    if (!phone && !autoNumber && !fullname && !qrcode) {
+    if (!phone && !autoNumber && !fullname && !qrcode && !userId) {
       return res.status(400).json({
-        message: "phone, autoNumber, fullname yoki qrcode yuborilishi kerak",
+        message:
+          "phone, autoNumber, fullname, qrcode yoki userId yuborilishi kerak",
       });
     }
 
-    const fullnameRegex = fullname
-      ? { fullname: { $regex: fullname, $options: "i" } }
-      : null;
+    const orQuery = [];
 
-    const user = await User.findOne({
-      $or: [
-        phone ? { phone } : null,
-        autoNumber ? { autoNumber } : null,
-        fullnameRegex,
-        qrcode ? { qrcode } : null,
-      ].filter(Boolean),
-    }).populate("companyFilial");
+    if (userId) orQuery.push({ _id: userId });
+    if (phone) orQuery.push({ phone });
+    if (autoNumber) orQuery.push({ autoNumber });
+    if (qrcode) orQuery.push({ qrcode });
+    if (fullname) {
+      orQuery.push({
+        fullname: { $regex: fullname, $options: "i" },
+      });
+    }
+
+    const user = await User.findOne({ $or: orQuery }).populate("companyFilial");
 
     if (!user) {
       return res.status(404).json({ message: "Foydalanuvchi topilmadi" });
