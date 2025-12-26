@@ -216,38 +216,67 @@ export const getLatestTransactions = async (req, res) => {
     const match = buildMatch(req);
     const productId = req.query.product;
 
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const limit = Math.max(Number(req.query.limit) || 10, 1);
+    const skip = (page - 1) * limit;
+
     let transactions = await Transaction.find(match)
       .populate("user", "fullname phone")
       .populate("admin", "fullname phone role")
       .populate("filial", "name")
       .populate("items.product", "name unit price")
-      .sort({ createdAt: -1 })
-      .limit(10);
+      .sort({ createdAt: -1 });
 
+    // 🔹 Mahsulot bo‘yicha filtr
     if (productId) {
-      transactions = transactions.map((tx) => {
-        const filteredItems = tx.items.filter(
-          (item) => item.product._id.toString() === productId
-        );
-        const totalAmount = filteredItems.reduce((sum, i) => sum + i.amount, 0);
-        const totalCashback = filteredItems.reduce(
-          (sum, i) => sum + i.cashback,
-          0
-        );
-        return {
-          ...tx.toObject(),
-          items: filteredItems,
-          totalAmount,
-          totalCashback,
-        };
-      });
+      transactions = transactions
+        .map((tx) => {
+          const filteredItems = tx.items.filter(
+            (item) => item.product?._id.toString() === productId
+          );
+
+          if (filteredItems.length === 0) return null;
+
+          const totalAmount = filteredItems.reduce(
+            (sum, i) => sum + i.amount,
+            0
+          );
+
+          const totalCashback = filteredItems.reduce(
+            (sum, i) => sum + i.cashback,
+            0
+          );
+
+          return {
+            ...tx.toObject(),
+            items: filteredItems,
+            totalAmount,
+            totalCashback,
+          };
+        })
+        .filter(Boolean);
     }
 
-    res.json(transactions);
+    const total = transactions.length;
+    const totalPages = Math.ceil(total / limit);
+
+    const paginatedData = transactions.slice(skip, skip + limit);
+
+    res.json({
+      data: paginatedData,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
+
+
 
 /* ---------- TOP USERS BY EARN ---------- */
 export const getTopUsersByEarn = async (req, res) => {

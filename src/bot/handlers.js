@@ -42,7 +42,7 @@ export const startHandler = async (ctx) => {
             `🚗 ${user.autoNumber}\n` +
             `💳 ${user.cardNumber}\n` +
             `💰 ${getText(user, "balanceText", {
-              balance: user.balance,
+              balance: Math.floor(user.balance),
               purchase: user.latestPurchase?.amount || 0,
             })}`,
           reply_markup: getMainMenuKeyboard(user).reply_markup,
@@ -125,7 +125,7 @@ export const autoNumberHandler = async (ctx, user) => {
         `🚗 ${user.autoNumber}\n` +
         `💳 ${user.cardNumber}\n` +
         `💰 ${getText(user, "balanceText", {
-          balance: user.balance,
+          balance: Math.floor(user.balance),
           purchase: user.latestPurchase?.amount || 0,
         })}`,
       reply_markup: getMainMenuKeyboard(user).reply_markup,
@@ -152,7 +152,7 @@ export const menuTextHandler = async (ctx) => {
             `🚗 ${user.autoNumber}\n` +
             `💳 ${user.cardNumber}\n` +
             `💰 ${getText(user, "balanceText", {
-              balance: user.balance,
+              balance: Math.floor(user.balance),
               purchase: user.latestPurchase?.amount || 0,
             })}`,
           reply_markup: getMainMenuKeyboard(user).reply_markup,
