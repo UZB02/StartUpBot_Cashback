@@ -314,3 +314,155 @@ export const getTopUsersByEarn = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+/* ---------- PRODUCT COMPARISON BY FILIAL ---------- */
+export const getProductComparison = async (req, res) => {
+  try {
+    const match = buildMatch(req);
+
+    let pipeline = [
+      { $match: match },
+
+      // 🔹 items ichiga tushamiz
+      { $unwind: "$items" },
+
+      // 🔹 product bo‘yicha guruhlaymiz
+      {
+        $group: {
+          _id: {
+            product: "$items.product",
+            type: "$type",
+          },
+          totalAmount: { $sum: "$items.amount" },
+          quantity: { $sum: 1 },
+        },
+      },
+
+      // 🔹 product bo‘yicha jamlaymiz
+      {
+        $group: {
+          _id: "$_id.product",
+          earn: {
+            $sum: {
+              $cond: [{ $eq: ["$_id.type", "earn"] }, "$totalAmount", 0],
+            },
+          },
+          spend: {
+            $sum: {
+              $cond: [{ $eq: ["$_id.type", "spend"] }, "$totalAmount", 0],
+            },
+          },
+          quantity: { $sum: "$quantity" },
+        },
+      },
+
+      // 🔹 balans hisoblash
+      {
+        $addFields: {
+          balance: { $subtract: ["$earn", "$spend"] },
+        },
+      },
+
+      // 🔹 ko‘p ishlatilgan productlar yuqorida
+      { $sort: { earn: -1 } },
+    ];
+
+    let data = await Transaction.aggregate(pipeline);
+
+    // 🔹 product ma’lumotlarini populate qilish
+    data = await Product.populate(data, {
+      path: "_id",
+      select: "name unit price",
+    });
+
+    res.json(
+      data.map((i) => ({
+        productId: i._id._id,
+        productName: i._id.name,
+        unit: i._id.unit,
+        price: i._id.price,
+        earn: i.earn,
+        spend: i.spend,
+        balance: i.balance,
+        quantity: i.quantity,
+      }))
+    );
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+/* ---------- PRODUCT GROWTH ---------- */
+export const getProductGrowth = async (req, res) => {
+  try {
+    const { period, year, month, filial } = req.query;
+
+    const getRange = (offset = 0) => {
+      let y = Number(year);
+      let m = Number(month);
+
+      if (period === "month") m += offset;
+      if (period === "year") y += offset;
+
+      return getDateRange(period, y, m);
+    };
+
+    const current = getRange(0);
+    const previous = getRange(-1);
+
+    const build = (range) => ({
+      createdAt: { $gte: range.startDate, $lte: range.endDate },
+      filial: filial ? new mongoose.Types.ObjectId(filial) : undefined,
+      type: "earn",
+    });
+
+    const aggregate = async (range) => {
+      return Transaction.aggregate([
+        { $match: build(range) },
+        { $unwind: "$items" },
+        {
+          $group: {
+            _id: "$items.product",
+            total: { $sum: "$items.amount" },
+          },
+        },
+      ]);
+    };
+
+    const currentData = await aggregate(current);
+    const prevData = await aggregate(previous);
+
+    const prevMap = Object.fromEntries(
+      prevData.map(i => [i._id.toString(), i.total])
+    );
+
+    let result = currentData.map(i => {
+      const prev = prevMap[i._id.toString()] || 0;
+      const growth =
+        prev === 0 ? 100 : ((i.total - prev) / prev) * 100;
+
+      return {
+        product: i._id,
+        current: i.total,
+        previous: prev,
+        growth: Number(growth.toFixed(1)),
+      };
+    });
+
+    result = await Product.populate(result, {
+      path: "product",
+      select: "name",
+    });
+
+    res.json(
+      result.map(i => ({
+        productName: i.product.name,
+        current: i.current,
+        previous: i.previous,
+        growth: i.growth,
+      }))
+    );
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
