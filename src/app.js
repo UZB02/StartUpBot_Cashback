@@ -10,6 +10,7 @@ import transactionRoutes from "./routes/transaction.routes.js";
 import transactionDashboardRoutes from "./routes/transaction.dashboard.routes.js";
 import filialRoutes from "./routes/filial.routes.js";
 import productRoutes from "./routes/product.routes.js"
+import marketingMessage from "./routes/marketing.routes.js"
 
 const app = express();
 
@@ -25,5 +26,6 @@ app.use("/api/transactions", transactionRoutes);
 app.use("/api/filials", filialRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/dashboard", transactionDashboardRoutes);
+app.use("/api/marketing", marketingMessage);
 
 export default app;
