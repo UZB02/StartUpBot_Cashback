@@ -16,15 +16,15 @@ app.listen(PORT, () => {
 });
 
 // =============== AUTO PING (Node 18+) ===============
-const SELF_URL = process.env.RENDER_EXTERNAL_URL;
+// const SELF_URL = process.env.RENDER_EXTERNAL_URL;
 
-if (SELF_URL) {
-  setInterval(async () => {
-    try {
-      const res = await fetch(SELF_URL);
-      console.log(`[AUTO-PING] ${res.status} - ${new Date().toISOString()}`);
-    } catch (err) {
-      console.error("[AUTO-PING ERROR]", err.message);
-    }
-  }, 10 * 60 * 1000); // 10 daqiqa
-}
+// if (SELF_URL) {
+//   setInterval(async () => {
+//     try {
+//       const res = await fetch(SELF_URL);
+//       console.log(`[AUTO-PING] ${res.status} - ${new Date().toISOString()}`);
+//     } catch (err) {
+//       console.error("[AUTO-PING ERROR]", err.message);
+//     }
+//   }, 10 * 60 * 1000); // 10 daqiqa
+// }
