@@ -9,3 +9,5 @@ export const connectDB = async () => {
     process.exit(1);
   }
 };
+
+// await mongoose.connect("mongodb://127.0.0.1:27017/fuel_cashback");
