@@ -3,7 +3,7 @@ import { ENV } from "../config/env.js";
 
 export const generateToken = (payload) => {
   if (!ENV.JWT_SECRET) {
-    throw new Error("JWT_SECRET aniqlanmagan (.env yuklanmagan)");
+    throw new Error("JWT_SECRET aniqlanmagan");
   }
 
   return jwt.sign(payload, ENV.JWT_SECRET, {
