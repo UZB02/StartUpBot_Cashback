@@ -1,9 +1,8 @@
 import { Telegraf } from "telegraf";
+import { ENV } from "./env.js";
 
-const token = process.env.TELEGRAM_BOT_TOKEN;
-
-if (!token) {
+if (!ENV.TELEGRAM_TOKEN) {
   throw new Error("❌ TELEGRAM_BOT_TOKEN yuklanmadi");
 }
 
-export const bot = new Telegraf(token);
+export const bot = new Telegraf(ENV.TELEGRAM_TOKEN);

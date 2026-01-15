@@ -1,9 +1,8 @@
-import dotenv from "dotenv";
-dotenv.config(); // 🔥 FAQAT SHU YERDA
+import "dotenv/config"; // 🔥 ENG TO‘G‘RI, ENG BARQAROR
 
 import app from "./app.js";
 import { connectDB } from "./config/db.js";
-import "./bot/index.js";
+import "./bot/index.js"; // telegram shu yerda chaqiriladi
 
 connectDB();
 
