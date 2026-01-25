@@ -119,6 +119,7 @@ export const spendBalance = async (req, res) => {
   try {
     const { userId, filialId, items } = req.body;
 
+    // 1. Kirish ma'lumotlarini tekshirish
     if (!userId || !filialId || !Array.isArray(items) || items.length === 0) {
       return res
         .status(400)
@@ -126,66 +127,73 @@ export const spendBalance = async (req, res) => {
     }
 
     const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ message: "User topilmadi" });
+    if (!user)
+      return res.status(404).json({ message: "Foydalanuvchi topilmadi" });
 
     const filial = await Filial.findById(filialId);
     if (!filial) return res.status(404).json({ message: "Filial topilmadi" });
 
     let totalAmount = 0;
-    const transactionItems = [];
+    const preparedItems = [];
 
-    // 🔁 PRODUCTLAR BO‘YICHA AYLANAMIZ
+    // 2. Birinchi bosqich: Faqat hisoblash va tekshirish (Bazaga yozmasdan)
     for (const item of items) {
       const product = await Product.findById(item.productId);
       if (!product) {
-        return res.status(404).json({
-          message: `Product topilmadi: ${item.productId}`,
-        });
+        return res
+          .status(404)
+          .json({ message: `Mahsulot topilmadi: ${item.productId}` });
       }
 
       const quantity = Number(item.quantity);
-
       if (quantity <= 0) {
-        return res.status(400).json({
-          message: "Quantity noto‘g‘ri",
-        });
+        return res
+          .status(400)
+          .json({ message: `${product.name} miqdori noto‘g‘ri` });
       }
 
-      // ❗ Ombor tekshiruvi
+      // Ombor tekshiruvi
       if (product.quantity < quantity) {
-        return res.status(400).json({
-          message: `${product.name} uchun yetarli miqdor yo‘q`,
-        });
+        return res
+          .status(400)
+          .json({
+            message: `${product.name} uchun omborda yetarli miqdor yo‘q`,
+          });
       }
 
-      const price = product.price;
-      const discount = product.discount || 0;
-      const amount = price * quantity - discount;
-
+      const amount = product.price * quantity;
       totalAmount += amount;
 
-      transactionItems.push({
-        product: product._id,
-        quantity,
-        price,
-        discount,
-        amount,
-        cashback: 0,
+      // Keyingi qadam uchun ma'lumotlarni yig'ish
+      preparedItems.push({
+        productDoc: product, // Bazaga saqlash uchun ob'ekt
+        transactionItem: {
+          product: product._id,
+          quantity,
+          price: product.price,
+          amount,
+          cashback: 0,
+        },
       });
-
-      // 🔥 OMBORDAN AYIRAMIZ
-      product.quantity -= quantity;
-      await product.save();
     }
 
-    // ❗ BALANS TEKSHIRUVI
+    // 3. Umumiy balans tekshiruvi
     if ((user.balance || 0) < totalAmount) {
-      return res.status(400).json({
-        message: "Balans yetarli emas",
-      });
+      return res.status(400).json({ message: "Balans yetarli emas" });
     }
 
-    // ➖ TRANSACTION YARATISH
+    // 4. Ikkinchi bosqich: Bazani yangilash (Faqat barcha tekshiruvlardan o'tgandan keyin)
+    const transactionItems = [];
+
+    for (const item of preparedItems) {
+      // Ombordan ayirish
+      item.productDoc.quantity -= item.transactionItem.quantity;
+      await item.productDoc.save();
+
+      transactionItems.push(item.transactionItem);
+    }
+
+    // 5. Tranzaksiyani yaratish
     const transaction = await Transaction.create({
       user: userId,
       admin: req.user.id,
@@ -196,7 +204,7 @@ export const spendBalance = async (req, res) => {
       totalCashback: 0,
     });
 
-    // 🔥 USER BALANS UPDATE
+    // 6. Foydalanuvchi balansini yangilash
     await User.findByIdAndUpdate(
       userId,
       {
@@ -218,7 +226,7 @@ export const spendBalance = async (req, res) => {
     });
   } catch (error) {
     console.error("spendBalance error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Tizimda xatolik yuz berdi" });
   }
 };
 
