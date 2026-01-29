@@ -1,7 +1,7 @@
 import User from "../models/User.js";
 import Filial from "../models/Filial.js";
 import { generateQRCode } from "../services/qr.service.js";
-import { generateCardNumber } from "../services/cardnumber.service.js";
+import { formatCardNumber } from "../services/cardnumber.service.js";
 import {
   languageKeyboard,
   phoneKeyboard,
@@ -40,7 +40,7 @@ export const startHandler = async (ctx) => {
             `👤 ${user.fullname}\n` +
             `📞 ${user.phone}\n` +
             `🚗 ${user.autoNumber}\n` +
-            `💳 ${user.cardNumber}\n` +
+            `💳 ${user.cardNumber ? user.cardNumber : "Mavjud emas"}\n` +
             `💰 ${getText(user, "balanceText", {
               balance: Math.floor(user.balance),
               purchase: user.latestPurchase?.amount || 0,
@@ -86,7 +86,13 @@ export const contactHandler = async (ctx) => {
   const user = await User.findOne({ telegramId: ctx.from.id });
   if (!user) return;
 
-  user.phone = contact.phone_number;
+  // ✅ Telefonni + bilan saqlash
+  let phone = contact.phone_number;
+  if (!phone.startsWith("+")) {
+    phone = "+" + phone;
+  }
+
+  user.phone = phone;
   user.step = "fullname";
   await user.save();
 
@@ -104,12 +110,9 @@ export const fullnameHandler = async (ctx, user) => {
 /* Avtomobil raqami */
 export const autoNumberHandler = async (ctx, user) => {
   user.autoNumber = ctx.message.text;
-
-  if (!user.cardNumber) user.cardNumber = generateCardNumber();
-
   const qr = await generateQRCode({
     userId: user._id,
-    cardNumber: user.cardNumber,
+    cardNumber: user.cardNumber || null,
   });
   user.qrcode = qr;
   user.step = "done";
@@ -123,7 +126,7 @@ export const autoNumberHandler = async (ctx, user) => {
         `👤 ${user.fullname}\n` +
         `📞 ${user.phone}\n` +
         `🚗 ${user.autoNumber}\n` +
-        `💳 ${user.cardNumber}\n` +
+        `💳 ${user.cardNumber ? user.cardNumber : 'Mavjud emas'}\n` +
         `💰 ${getText(user, "balanceText", {
           balance: Math.floor(user.balance),
           purchase: user.latestPurchase?.amount || 0,
@@ -150,7 +153,7 @@ export const menuTextHandler = async (ctx) => {
             `👤 ${user.fullname}\n` +
             `📞 ${user.phone}\n` +
             `🚗 ${user.autoNumber}\n` +
-            `💳 ${user.cardNumber}\n` +
+            `💳 ${user.cardNumber ? user.cardNumber : "Mavjud emas"}\n` +
             `💰 ${getText(user, "balanceText", {
               balance: Math.floor(user.balance),
               purchase: user.latestPurchase?.amount || 0,

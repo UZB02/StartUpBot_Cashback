@@ -74,15 +74,37 @@ export const getUserById = async (req, res) => {
 };
 
 /**
- * ✏️ Foydalanuvchini tahrirlash
+ * ✏️ Foydalanuvchini tahrirlash (cardNumber bilan)
  * PUT /api/users/:id
  */
 export const updateUser = async (req, res) => {
   try {
-    const updatedUser = await User.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    }).populate("companyFilial");
+    const { cardNumber } = req.body;
+
+    // 🔐 Agar cardNumber yuborilgan bo‘lsa, boshqasida yo‘qligini tekshiramiz
+    if (cardNumber) {
+      const exists = await User.findOne({
+        cardNumber,
+        _id: { $ne: req.params.id }, // o‘zi emasligini tekshiradi
+      });
+
+      if (exists) {
+        return res.status(400).json({
+          message: "Bu cardNumber boshqa foydalanuvchiga tegishli",
+        });
+      }
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.id,
+      {
+        $set: req.body, // 🔑 cardNumber shu yerda yangilanadi
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    ).populate("companyFilial");
 
     if (!updatedUser) {
       return res.status(404).json({ message: "Foydalanuvchi topilmadi" });
@@ -93,6 +115,7 @@ export const updateUser = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
 
 /**
  * 🗑 Foydalanuvchini o‘chirish
