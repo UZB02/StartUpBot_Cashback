@@ -6,12 +6,20 @@ import User from "../models/User.js";
  */
 export const findUser = async (req, res) => {
   try {
-    const { phone, autoNumber, fullname, qrcode, userId } = req.query;
+    const { phone, autoNumber, fullname, qrcode, userId, cardNumber } =
+      req.query;
 
-    if (!phone && !autoNumber && !fullname && !qrcode && !userId) {
+    if (
+      !phone &&
+      !autoNumber &&
+      !fullname &&
+      !qrcode &&
+      !userId &&
+      !cardNumber
+    ) {
       return res.status(400).json({
         message:
-          "phone, autoNumber, fullname, qrcode yoki userId yuborilishi kerak",
+          "phone, autoNumber, fullname, qrcode, cardNumber yoki userId yuborilishi kerak",
       });
     }
 
@@ -21,6 +29,7 @@ export const findUser = async (req, res) => {
     if (phone) orQuery.push({ phone });
     if (autoNumber) orQuery.push({ autoNumber });
     if (qrcode) orQuery.push({ qrcode });
+    if (cardNumber) orQuery.push({ cardNumber });
     if (fullname) {
       orQuery.push({
         fullname: { $regex: fullname, $options: "i" },
