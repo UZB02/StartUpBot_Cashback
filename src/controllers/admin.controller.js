@@ -4,7 +4,7 @@ import bcrypt from "bcrypt";
 // 1️⃣ Admin yaratish
 export const createAdmin = async (req, res) => {
   try {
-    const { fullname, phone, password, role } = req.body;
+    const { fullname, phone, password, role, permissions } = req.body;
 
     const hashed = await bcrypt.hash(password, 10);
 
@@ -13,6 +13,7 @@ export const createAdmin = async (req, res) => {
       phone,
       password: hashed,
       role,
+      permissions: permissions || [],
     });
 
     res.json(admin);
@@ -50,9 +51,10 @@ export const getAdminById = async (req, res) => {
 export const updateAdmin = async (req, res) => {
   try {
     const { id } = req.params;
-    const { fullname, phone, password, role } = req.body;
+    const { fullname, phone, password, role, permissions } = req.body;
 
     const updateData = { fullname, phone, role };
+    if (permissions) updateData.permissions = permissions;
 
     if (password) {
       const hashed = await bcrypt.hash(password, 10);

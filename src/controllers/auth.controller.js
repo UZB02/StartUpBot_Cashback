@@ -32,6 +32,7 @@ export const login = async (req, res) => {
         fullname: admin.fullname,
         phone: admin.phone,
         role: admin.role,
+        permissions: admin.permissions || [],
         filial: admin.filial,
       },
     });
